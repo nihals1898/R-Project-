@@ -1,0 +1,216 @@
+---
+title: "Enron Email Analysis"
+author: "Nihal Sachindra"
+date: "18-05-2025"
+output: html_document
+---
+
+## Introduction:
+
+This project explores internal email patterns within Enron using R and RStudio.
+The study focuses on examining sender behavior, exploring the roles of employees within the organization, analyzing communication trends over time, and investigating the content of email subjects.Through this analysis, I aim to exhibit meaningful insights into organizational dynamics and information flow within Enron.
+
+## Libraries Used:
+
+```{r setup, include=FALSE}
+
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(tidytext)
+
+```
+
+## Step 1: Load the Data in RStudio
+
+```{r}
+load("Enron (1).Rdata")
+ls()
+```
+
+## Step 2: Explore the Data
+
+```{r}
+str(employeelist)
+head(employeelist)
+summary(employeelist)
+str(message)
+head(message)
+summary(message)
+str(recipientinfo)
+head(recipientinfo)
+summary(recipientinfo)
+glimpse(employeelist)
+glimpse(message)
+glimpse(recipientinfo)
+```
+
+
+## Step 3: Top Email Senders
+
+```{r step3, echo=FALSE, message=FALSE}
+
+top_senders <- message %>%
+  group_by(sender) %>%
+  summarise(n_sent = n()) %>%
+  arrange(desc(n_sent))
+head(top_senders, 10)
+
+top_senders %>%
+  slice_max(n_sent, n = 10) %>%
+  ggplot(aes(x = reorder(sender, n_sent), y = n_sent)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Top 10 Most Active Email Senders",
+    x = "Sender",
+    y = "Number of Emails Sent"
+  ) +
+  theme_minimal()
+
+```
+Insight: A small group of employees generated most of the internal emails.
+
+
+
+
+## Step 4: Email Activity by Role
+
+```{r step4, echo=FALSE, message=FALSE}
+message_with_status <- message %>%
+  left_join(employeelist, by = c("sender" = "Email_id"))
+emails_by_status_clean <- message_with_status %>%
+  filter(!is.na(status)) %>%
+  group_by(status) %>%
+  summarize(n_sent = n()) %>%
+  arrange(desc(n_sent))
+print(emails_by_status_clean)
+
+emails_by_status_clean <- message_with_status %>%
+  filter(!is.na(status), status != "N/A") %>%
+  group_by(status) %>%
+  summarise(n_sent = n()) %>%
+  arrange(desc(n_sent))
+print(emails_by_status_clean)
+
+ggplot(emails_by_status_clean, aes(x = reorder(status, n_sent), y = n_sent)) +
+  geom_bar(stat = "identity", fill = "darkgreen") +
+  coord_flip() +
+  labs(
+    title = "Emails Sent by Employee Role (Known Status Only)",
+    x = "Employee Role (Status)",
+    y = "Number of Emails Sent"
+  ) +
+  theme_minimal()
+
+
+```
+Observation: Employees and Vice Presidents were the most active communicators.
+
+
+
+
+## Step 5: Monthly Email Volume
+
+```{r step5, echo=FALSE, message=FALSE}
+message <- message %>%
+  mutate(date = as.POSIXct(date, tz = "UTC"))
+
+message_clean <- message %>%
+  filter(date >= as.POSIXct("1998-01-01", tz = "UTC") & date < as.POSIXct("2003-01-01", tz = "UTC"))
+
+emails_over_time <- message_clean %>%
+  mutate(month_str = format(date, "%Y-%m"),
+         month = lubridate::ym(month_str)) %>%
+  group_by(month) %>%
+  summarise(n_emails = n(), .groups = "drop")
+
+ggplot(emails_over_time, aes(x = month, y = n_emails)) +
+  geom_line(color = "tomato", linewidth = 1) +
+  labs(
+    title = "Monthly Email Volume at Enron",
+    subtitle = "Clear trends visible leading up to and during the 2001 Enron scandal",
+    x = "Month",
+    y = "Number of Emails Sent"
+  ) +
+  scale_x_date(
+    date_labels = "%b %Y",
+    date_breaks = "3 months"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+Insight: Email volume shows clear trends leading up to and during the 2001 Enron scandal.
+
+
+
+
+## Step 6: Subject Line Word Frequency
+
+```{r step6, echo=FALSE, message=FALSE}
+
+subject_words <- message %>%
+  select(subject) %>%
+  filter(!is.na(subject)) %>%
+  unnest_tokens(word, subject)
+
+data("stop_words")  
+subject_words_clean <- subject_words %>%
+  anti_join(stop_words, by = "word")
+
+top_subject_words <- subject_words_clean %>%
+  count(word, sort = TRUE)
+
+top_subject_words %>%
+  slice_max(n, n = 15) %>%
+  ggplot(aes(x = reorder(word, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Top Words in Enron Email Subjects",
+    x = "Word",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
+
+```
+Observation: Frequent terms like “fw,” “meeting,” “gas,” and “update” reflecting operational discussions, internal coordination, and energy-related business communications within Enron.
+
+
+
+
+## Step 7: Interactive Shiny App
+
+To complement the static analysis, I developed a **Shiny web application** that enables users to interactively explore the Enron email dataset.
+
+## Features of the App:
+- Filter emails by **sender** or **employee role**
+- View **email volume trends** over time
+- Explore **frequent words** in email subject lines
+- Visualize insights using interactive plots and tables
+
+To run the app locally:
+
+shiny::runApp("app.R")
+
+
+
+## Conclusion:
+
+- Email volume and forwarding activity increased significantly during Enron’s collapse, showing intensified internal communication.
+
+- Middle-level employees, particularly Vice Presidents and managers, were the main communicators, highlighting their key role in information flow.
+
+- Most email subject lines focused on internal meetings and updates, indicating an emphasis on coordination and operations.
+
+- The R programming language was effective for network analysis, time series evaluation, and text mining, providing deep insights into communication patterns.
+
+
+## README:
+
+Tools and libraries used:
+
+dplyr, ggplot2, lubridate, tidytext, shiny
